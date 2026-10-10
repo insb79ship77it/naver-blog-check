@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>네이버 블로그 포스팅 누락 체커</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Pretendard Font -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css">
     <style> body { font-family: 'Pretendard', sans-serif; } </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen py-10 px-4">
-    <div class="max-w-5xl mx-auto">
+    <div class="max-w-6xl mx-auto">
         <header class="mb-8 text-center">
             <h1 class="text-3xl font-bold text-slate-900 mb-2">📊 최근 포스팅 노출/누락 체커</h1>
             <p class="text-slate-600">내 블로그 ID를 입력하여 최근 글들의 네이버 색인 상태를 확인하세요.</p>
@@ -19,7 +21,7 @@
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 flex gap-3">
             <input type="text" id="blogIdInput" placeholder="네이버 블로그 아이디 입력 (예: myblogid)" 
                 class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
-            <button onclick="checkBlogPosts()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm cursor-pointer">
+            <button onclick="checkBlogPosts()" id="searchBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm cursor-pointer">
                 조회하기
             </button>
         </div>
@@ -40,8 +42,8 @@
                         <tr class="bg-slate-100/70 border-b border-slate-200 text-xs font-semibold text-slate-600">
                             <th class="py-3.5 px-4 w-24">상태</th>
                             <th class="py-3.5 px-4">글 제목</th>
-                            <th class="py-3.5 px-4 w-32">발행일</th>
-                            <th class="py-3.5 px-4 w-28 text-center">바로가기</th>
+                            <th class="py-3.5 px-4 w-40">발행일</th>
+                            <th class="py-3.5 px-4 w-44 text-center">바로가기</th>
                         </tr>
                     </thead>
                     <tbody id="postTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
@@ -51,8 +53,8 @@
     </div>
 
     <script>
-        // 백엔드 Cloudflare Worker URL
-        const WORKER_URL = "https://naver-blog-check.insublue79.workers.dev/"; // 본인의 Worker 주소로 변경 필요
+        // 본인의 Cloudflare Worker URL로 변경해주세요!
+        const WORKER_URL = "https://naver-blog-check.insublue79.workers.dev/"; 
 
         async function checkBlogPosts() {
             const blogId = document.getElementById('blogIdInput').value.trim();
@@ -62,12 +64,30 @@
             }
 
             const tbody = document.getElementById('postTableBody');
-            tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-500">최근 포스팅 상태를 조회 중입니다...</td></tr>`;
-            document.getElementById('resultContainer').classList.remove('hidden');
+            const resultContainer = document.getElementById('resultContainer');
+            const searchBtn = document.getElementById('searchBtn');
+
+            searchBtn.disabled = true;
+            resultContainer.classList.remove('hidden');
+
+            // 1. 조회 중 초(sec) 표시 타이머 시작
+            let seconds = 0;
+            tbody.innerHTML = `<tr><td colspan="4" class="py-10 text-center text-slate-500 font-medium">
+                최근 포스팅 상태를 조회 중입니다... (<span id="timer" class="text-emerald-600 font-bold">0</span>초 경과)
+            </td></tr>`;
+            
+            const timerInterval = setInterval(() => {
+                seconds++;
+                const timerEl = document.getElementById('timer');
+                if (timerEl) timerEl.innerText = seconds;
+            }, 1000);
 
             try {
                 const res = await fetch(`${WORKER_URL}?blogId=${blogId}`);
                 const data = await res.json();
+
+                clearInterval(timerInterval);
+                searchBtn.disabled = false;
 
                 if (data.error) {
                     alert('오류 발생: ' + data.error);
@@ -76,7 +96,10 @@
 
                 renderResults(data.posts);
             } catch (err) {
+                clearInterval(timerInterval);
+                searchBtn.disabled = false;
                 alert('데이터를 불러오는데 실패했습니다.');
+                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500">데이터 조회 실패</td></tr>`;
             }
         }
 
@@ -95,14 +118,27 @@
                     ? `<span class="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-md text-xs font-semibold">노출</span>`
                     : `<span class="bg-red-100 text-red-700 px-2.5 py-1 rounded-md text-xs font-semibold">누락</span>`;
 
+                // 2. 발행일을 한글 포맷으로 변환 (예: 2026-10-10 13:55 -> 2026년 10월 10일 13:55)
+                let formattedDate = post.pubDate;
+                const dateMatch = post.pubDate.match(/^(\d{4})-(\d{2})-(\d{2})\s(.+)$/);
+                if (dateMatch) {
+                    formattedDate = `${dateMatch[1]}년 ${parseInt(dateMatch[2])}월 ${parseInt(dateMatch[3])}일 ${dateMatch[4]}`;
+                }
+
+                // 3. 네이버 검색 결과 링크 생성
+                const searchUrl = `https://search.naver.com/search.naver?where=view&query=${encodeURIComponent('"' + post.title + '"')}`;
+
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50/80 transition-colors';
                 tr.innerHTML = `
                     <td class="py-3.5 px-4">${statusBadge}</td>
                     <td class="py-3.5 px-4 font-medium text-slate-800">${escapeHtml(post.title)}</td>
-                    <td class="py-3.5 px-4 text-xs text-slate-500">${post.pubDate.substring(0, 16)}</td>
+                    <td class="py-3.5 px-4 text-xs text-slate-500">${formattedDate}</td>
                     <td class="py-3.5 px-4 text-center">
-                        <a href="${post.link}" target="_blank" class="text-xs text-emerald-600 underline font-medium">글보기</a>
+                        <div class="flex items-center justify-center gap-2">
+                            <a href="${post.link}" target="_blank" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg font-medium transition-colors">블로그글</a>
+                            <a href="${searchUrl}" target="_blank" class="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg font-medium transition-colors">검색결과</a>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
