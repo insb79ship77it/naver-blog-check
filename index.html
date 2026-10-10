@@ -3,161 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>네이버 블로그 검색 노출 체커</title>
-    <!-- Tailwind CSS CDN -->
+    <title>네이버 블로그 포스팅 누락 체커</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Pretendard Font -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css">
-    <style>
-        body { font-family: 'Pretendard', sans-serif; }
-    </style>
+    <style> body { font-family: 'Pretendard', sans-serif; } </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen py-10 px-4">
-    <div class="max-w-4xl mx-auto">
-        <!-- Header -->
+    <div class="max-w-5xl mx-auto">
         <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-slate-900 mb-2">🔍 네이버 블로그 검색 노출 체커</h1>
-            <p class="text-slate-600">블로그 주소와 키워드를 입력해 검색 노출 여부를 쉽고 빠르게 확인하세요.</p>
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">📊 최근 포스팅 노출/누락 체커</h1>
+            <p class="text-slate-600">내 블로그 ID를 입력하여 최근 글들의 네이버 색인 상태를 확인하세요.</p>
         </header>
 
-        <!-- Input Section -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-            <div class="mb-4">
-                <label class="block text-sm font-semibold text-slate-700 mb-2" for="blogUrl">내 블로그 주소 (또는 블로그 ID/닉네임)</label>
-                <input type="text" id="blogUrl" placeholder="예: https://blog.naver.com/아이디 또는 닉네임" 
-                    class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm">
-            </div>
-            <div class="mb-5">
-                <label class="block text-sm font-semibold text-slate-700 mb-2" for="keywords">체크할 키워드 목록 (줄바꿈으로 구분)</label>
-                <textarea id="keywords" rows="5" placeholder="키워드1&#10;키워드2&#10;키워드3" 
-                    class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"></textarea>
-            </div>
-            <div class="flex gap-3">
-                <button onclick="generateChecklist()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-xl transition-colors text-sm shadow-sm cursor-pointer">
-                    체크리스트 생성하기
-                </button>
-                <button onclick="clearData()" class="px-5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium py-3 rounded-xl transition-colors text-sm cursor-pointer">
-                    초기화
-                </button>
-            </div>
+        <!-- 입력 영역 -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 flex gap-3">
+            <input type="text" id="blogIdInput" placeholder="네이버 블로그 아이디 입력 (예: myblogid)" 
+                class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+            <button onclick="checkBlogPosts()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm cursor-pointer">
+                조회하기
+            </button>
         </div>
 
-        <!-- Result Section -->
-        <div id="resultSection" class="hidden">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-slate-900">📊 검색 확인 대시보드</h2>
-                <span id="keywordCount" class="text-xs font-semibold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full"></span>
+        <!-- 결과 영역 -->
+        <div id="resultContainer" class="hidden">
+            <!-- 요약 태그 -->
+            <div class="flex gap-2 mb-4">
+                <span id="badgeTotal" class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-semibold">전체 0</span>
+                <span id="badgeIndexed" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">노출 0</span>
+                <span id="badgeMissing" class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">누락 0</span>
             </div>
-            
+
+            <!-- 테이블 -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-slate-100/70 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                <th class="py-3 px-4">번호</th>
-                                <th class="py-3 px-4">키워드</th>
-                                <th class="py-3 px-4">네이버 검색 바로가기</th>
-                                <th class="py-3 px-4 text-center">확인 상태</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultTableBody" class="divide-y divide-slate-100 text-sm">
-                            <!-- JS로 동적 생성 -->
-                        </tbody>
-                    </table>
-                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100/70 border-b border-slate-200 text-xs font-semibold text-slate-600">
+                            <th class="py-3.5 px-4 w-24">상태</th>
+                            <th class="py-3.5 px-4">글 제목</th>
+                            <th class="py-3.5 px-4 w-32">발행일</th>
+                            <th class="py-3.5 px-4 w-28 text-center">바로가기</th>
+                        </tr>
+                    </thead>
+                    <tbody id="postTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <script>
-        // 페이지 로드 시 로컬 스토리지 데이터 복구
-        window.onload = function() {
-            const savedUrl = localStorage.getItem('naver_blog_url');
-            const savedKeywords = localStorage.getItem('naver_blog_keywords');
-            if (savedUrl) document.getElementById('blogUrl').value = savedUrl;
-            if (savedKeywords) document.getElementById('keywords').value = savedKeywords;
-            if (savedUrl && savedKeywords) generateChecklist();
-        };
+        // 백엔드 Cloudflare Worker URL
+        const WORKER_URL = "https://naver-blog-check.insublue79.workers.dev/"; // 본인의 Worker 주소로 변경 필요
 
-        function generateChecklist() {
-            const blogUrl = document.getElementById('blogUrl').value.trim();
-            const keywordsRaw = document.getElementById('keywords').value.trim();
-
-            if (!blogUrl) {
-                alert('블로그 주소를 입력해주세요.');
-                return;
-            }
-            if (!keywordsRaw) {
-                alert('키워드를 최소 1개 이상 입력해주세요.');
+        async function checkBlogPosts() {
+            const blogId = document.getElementById('blogIdInput').value.trim();
+            if (!blogId) {
+                alert('블로그 아이디를 입력하세요.');
                 return;
             }
 
-            // 로컬 스토리지 저장
-            localStorage.setItem('naver_blog_url', blogUrl);
-            localStorage.setItem('naver_blog_keywords', keywordsRaw);
+            const tbody = document.getElementById('postTableBody');
+            tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-500">최근 포스팅 상태를 조회 중입니다...</td></tr>`;
+            document.getElementById('resultContainer').classList.remove('hidden');
 
-            const keywords = keywordsRaw.split('\n').map(k => k.trim()).filter(k => k.length > 0);
-            const tbody = document.getElementById('resultTableBody');
+            try {
+                const res = await fetch(`${WORKER_URL}?blogId=${blogId}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    alert('오류 발생: ' + data.error);
+                    return;
+                }
+
+                renderResults(data.posts);
+            } catch (err) {
+                alert('데이터를 불러오는데 실패했습니다.');
+            }
+        }
+
+        function renderResults(posts) {
+            const tbody = document.getElementById('postTableBody');
             tbody.innerHTML = '';
 
-            document.getElementById('keywordCount').innerText = `총 ${keywords.length}개 키워드`;
+            let indexedCount = 0;
+            let missingCount = 0;
 
-            keywords.forEach((keyword, index) => {
-                const searchUrl = `https://search.naver.com/search.naver?where=view&query=${encodeURIComponent(keyword)}&sm=tab_jum&lds=y`;
-                
+            posts.forEach(post => {
+                const isIndexed = post.status === "노출";
+                if (isIndexed) indexedCount++; else missingCount++;
+
+                const statusBadge = isIndexed
+                    ? `<span class="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-md text-xs font-semibold">노출</span>`
+                    : `<span class="bg-red-100 text-red-700 px-2.5 py-1 rounded-md text-xs font-semibold">누락</span>`;
+
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50/80 transition-colors';
                 tr.innerHTML = `
-                    <td class="py-3.5 px-4 text-slate-500 font-medium">${index + 1}</td>
-                    <td class="py-3.5 px-4 font-semibold text-slate-800">${escapeHtml(keyword)}</td>
-                    <td class="py-3.5 px-4">
-                        <a href="${searchUrl}" target="_blank" onclick="markChecked(this)" class="inline-flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 font-medium underline text-xs bg-emerald-50 px-2.5 py-1.5 rounded-lg transition-colors">
-                            <span>네이버에서 검색</span>
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                        </a>
-                    </td>
+                    <td class="py-3.5 px-4">${statusBadge}</td>
+                    <td class="py-3.5 px-4 font-medium text-slate-800">${escapeHtml(post.title)}</td>
+                    <td class="py-3.5 px-4 text-xs text-slate-500">${post.pubDate.substring(0, 16)}</td>
                     <td class="py-3.5 px-4 text-center">
-                        <button onclick="toggleStatus(this)" class="status-btn text-xs px-3 py-1 rounded-full font-medium bg-amber-100 text-amber-800 cursor-pointer hover:bg-amber-200 transition-colors">
-                            미확인
-                        </button>
+                        <a href="${post.link}" target="_blank" class="text-xs text-emerald-600 underline font-medium">글보기</a>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
 
-            document.getElementById('resultSection').classList.remove('hidden');
-        }
-
-        function markChecked(el) {
-            const row = el.closest('tr');
-            const btn = row.querySelector('.status-btn');
-            if (btn.innerText === '미확인') {
-                btn.innerText = '확인 완료';
-                btn.className = 'status-btn text-xs px-3 py-1 rounded-full font-medium bg-emerald-100 text-emerald-800 cursor-pointer hover:bg-emerald-200 transition-colors';
-            }
-        }
-
-        function toggleStatus(btn) {
-            if (btn.innerText === '미확인') {
-                btn.innerText = '확인 완료';
-                btn.className = 'status-btn text-xs px-3 py-1 rounded-full font-medium bg-emerald-100 text-emerald-800 cursor-pointer hover:bg-emerald-200 transition-colors';
-            } else {
-                btn.innerText = '미확인';
-                btn.className = 'status-btn text-xs px-3 py-1 rounded-full font-medium bg-amber-100 text-amber-800 cursor-pointer hover:bg-amber-200 transition-colors';
-            }
-        }
-
-        function clearData() {
-            localStorage.removeItem('naver_blog_url');
-            localStorage.removeItem('naver_blog_keywords');
-            document.getElementById('blogUrl').value = '';
-            document.getElementById('keywords').value = '';
-            document.getElementById('resultSection').classList.add('hidden');
+            document.getElementById('badgeTotal').innerText = `전체 ${posts.length}`;
+            document.getElementById('badgeIndexed').innerText = `노출 ${indexedCount}`;
+            document.getElementById('badgeMissing').innerText = `누락 ${missingCount}`;
         }
 
         function escapeHtml(text) {
-            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-            return text.replace(/[&<>"']/g, m => map[m]);
+            return text.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
         }
     </script>
 </body>
