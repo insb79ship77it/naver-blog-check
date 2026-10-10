@@ -7,28 +7,22 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css">
     <style> body { font-family: 'Pretendard', sans-serif; } </style>
+    <!-- 설정 파일 불러오기 -->
+    <script src="./config.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen py-10 px-4">
     <div class="max-w-6xl mx-auto">
         <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-slate-900 mb-2">📊 최근 포스팅 노출/누락 체커</h1>
-            <p class="text-slate-600">내 블로그 ID와 Cloudflare Worker 주소를 입력하여 최근 글들의 색인 상태를 확인하세요.</p>
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">최근 포스팅 노출/누락 체커</h1>
         </header>
 
-        <!-- 설정 및 입력 영역 -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 space-y-4">
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Cloudflare Worker 주소</label>
-                <input type="text" id="workerUrlInput" placeholder="https://your-worker.workers.dev" 
-                    class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs text-slate-600">
-            </div>
-            <div class="flex gap-3">
-                <input type="text" id="blogIdInput" placeholder="네이버 블로그 아이디 입력 (예: myblogid)" 
-                    class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
-                <button onclick="checkBlogPosts()" id="searchBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm cursor-pointer">
-                    조회하기 (최대 50개)
-                </button>
-            </div>
+        <!-- 입력 영역 -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 flex gap-3">
+            <input type="text" id="blogIdInput" placeholder="네이버 블로그 아이디 입력 (예: myblogid)" 
+                class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+            <button onclick="checkBlogPosts()" id="searchBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm cursor-pointer">
+                조회하기
+            </button>
         </div>
 
         <!-- 결과 영역 -->
@@ -64,22 +58,23 @@
         const rowsPerPage = 10;
 
         window.onload = function() {
-            const savedWorkerUrl = localStorage.getItem('cf_worker_url');
             const savedBlogId = localStorage.getItem('naver_blog_id');
-            if (savedWorkerUrl) document.getElementById('workerUrlInput').value = savedWorkerUrl;
             if (savedBlogId) document.getElementById('blogIdInput').value = savedBlogId;
         };
 
         async function checkBlogPosts() {
-            const workerUrl = document.getElementById('workerUrlInput').value.trim();
             const blogId = document.getElementById('blogIdInput').value.trim();
 
-            if (!workerUrl || !blogId) {
-                alert('Worker 주소와 블로그 아이디를 모두 입력해주세요.');
+            if (!blogId) {
+                alert('네이버 블로그 아이디를 입력하세요.');
                 return;
             }
 
-            localStorage.setItem('cf_worker_url', workerUrl);
+            if (typeof CONFIG === 'undefined' || !CONFIG.WORKER_URL) {
+                alert('config.js 파일에서 Worker 주소를 설정해주세요.');
+                return;
+            }
+
             localStorage.setItem('naver_blog_id', blogId);
 
             const tbody = document.getElementById('postTableBody');
@@ -101,7 +96,7 @@
             }, 1000);
 
             try {
-                const res = await fetch(`${workerUrl}?blogId=${blogId}`);
+                const res = await fetch(`${CONFIG.WORKER_URL}?blogId=${blogId}`);
                 const data = await res.json();
 
                 clearInterval(timerInterval);
